@@ -44,20 +44,26 @@ def write_tree(filename, root):
 	f.close()
 
 ##
-# Combines the children of nodes that have the same natural key.
-# The combination is stable; that is, the children are travered
+# Combines the immediate child nodes of a parent, where the child nodes
+# have the same natural key.
+# The combination is stable; that is, nodes are travered
 # in document order (depth first) and node children are appended
-# to the first encountered node with the same natural key
+# to the first encountered node with the same natural key. This only
+# combines child nodes with the same immediate parent; if two nodes
+# have the same natural key, but have different immediate parents,
+# they will not be combined.
 
 def coalesce_tree(root):
-	_coalesce_children(root)
+	_coalesce_recursive(root)
 
 
-def _coalesce_children(parent):
+def _coalesce_recursive(parent):
 	survivors = dict()
 
 	for child in parent.getchildren():
-		key = _natural_key(parent)
+		_coalesce_recursive(child)
+
+		key = _natural_key(child)
 
 		if key in survivors:
 			survivors[key].extend(child.getchildren())
@@ -67,16 +73,21 @@ def _coalesce_children(parent):
 
 ##
 # Sorts nodes recursively, ordered by natural key
+#
+# @param ignoreTags Don't sort a subtree if the root has any of these tags
+# This is useful if you have nodes with meaningful order
+# i.e. A 'Target' node that specifies an ordered build task
 
-def sort_tree(root):
-	_sort_nodes_resursive(root.getchildren())
+def sort_tree(root, ignoreTags=[]):
+	_sort_nodes_resursive(root.getchildren(), ignoreTags)
 
 
-def _sort_nodes_resursive(nodes):
+def _sort_nodes_resursive(nodes, ignoreTags):
 	nodes.sort(key=_natural_key)
 
 	for node in nodes:
-		_sort_nodes_resursive(node.getchildren())
+		if  node.tag not in ignoreTags:
+			_sort_nodes_resursive(node.getchildren(), ignoreTags)
 
 ##
 # Generates a natural key for a node by concatenating the tag, attribute 
@@ -101,13 +112,16 @@ def _natural_key(node):
 	return key
 
 ##
-# Fuck your arbitrary bullshit .csproj files
+# Unfuckulate the xml
 
-def unfuckulate(inFileName, outFileName):
+def unfuckulate(inFileName, outFileName, dontSortTags=[]):
 	root = read_tree(inFileName)
 	coalesce_tree(root)
-	sort_tree(root)
+	sort_tree(root, dontSortTags)
 	write_tree(outFileName, root)
+
+def unfuckulate_csproj(inFileName, outFileName):
+	unfuckulate(inFileName, outFileName, ['Target', 'PostBuildEvent'])
 
 if __name__ == '__main__':
 	unfuckulate(sys.argv[1], sys.argv[2])
