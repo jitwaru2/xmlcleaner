@@ -1,0 +1,30 @@
+<Project Attrib1="proj1" Attrib2="proj2">
+	<ItemGroup>
+		<Build Include="myval/b">
+			blah blah
+			omg bbq
+			wtfomg
+		</Build>
+		<Build Include="myval/a"></Build>
+		<ItemGroup>
+			<Build Include="myval/b">
+				blah blah
+				omg bbq
+				wtfomg
+			</Build>
+			<Build Include="myval/a"></Build>
+		</ItemGroup>
+		<ItemGroup>
+			<Build Include="myval/d">
+				merp
+			</Build>
+			<Build Include="myval/c"></Build>
+		</ItemGroup>
+	</ItemGroup>
+	<ItemGroup>
+		<Build Include="myval/d">
+			merp
+		</Build>
+		<Build Include="myval/c"></Build>
+	</ItemGroup>
+</Project>
