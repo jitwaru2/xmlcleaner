@@ -14,7 +14,16 @@ def read_tree(filename):
 	f.close()
 	root = ET.fromstring(contents)
 
-	# Clean up extraneous whitespace; the ET parser ain't perfect
+	# Clean up extraneous whitespace
+	# Take the following XML:
+	# <node>\n\t
+	# 	<innerNode>\n\t
+	# 	</innerNode>\n
+	# </node>
+	# ET treats the whitespace follwing each starting tag declaration as node
+	# text, maybe in an attempt to prevent data loss - but this screws with 
+	# pretty printing. I think it's safe to treat any pure whitespace string
+	# as insignificant.
 	rootIter = root.iter()
 
 	for node in rootIter:
@@ -26,19 +35,60 @@ def read_tree(filename):
 	return root
 
 def write_tree(filename, root):
+	# Unfortunately have to rely on minidom to do the pretty printing
+	# because ET sucks at it
 	pretty = minidom.parseString(ET.tostring(root)).toprettyxml().encode('UTF-8')
 	
 	f = open(filename, 'w')
 	f.write(pretty)
 	f.close()
 
-def sort_resursive(nodes):
-	nodes.sort(key=node_key_selector)
+##
+# Combines the children of nodes that have the same natural key.
+# The combination is stable; that is, the children are travered
+# in document order (depth first) and node children are appended
+# to the first encountered node with the same natural key
+
+def coalesce_tree(root):
+	_coalesce_children(root)
+
+
+def _coalesce_children(parent):
+	survivors = dict()
+
+	for child in parent.getchildren():
+		key = _natural_key(parent)
+
+		if key in survivors:
+			survivors[key].extend(child.getchildren())
+			parent.remove(child)
+		else:
+			survivors[key] = child
+
+##
+# Sorts nodes recursively, ordered by natural key
+
+def sort_tree(root):
+	_sort_nodes_resursive(root.getchildren())
+
+
+def _sort_nodes_resursive(nodes):
+	nodes.sort(key=_natural_key)
 
 	for node in nodes:
-		sort_resursive(node.getchildren())
+		_sort_nodes_resursive(node.getchildren())
 
-def node_key_selector(node):
+##
+# Generates a natural key for a node by concatenating the tag, attribute 
+# names, and attribute value (after lexicographically sorting the attributes 
+# by key)
+# i.e. <Josh Attr2="Value2" Attr1="Value1"></Josh>
+# Generated key: JoshAttr1Value1Attr2Value2
+#
+# Useful for sorting nodes and identifying which nodes can safely be 
+# coalesced
+
+def _natural_key(node):
 	key = node.tag
 
 	attrs = list(node.attrib.keys())
@@ -50,22 +100,13 @@ def node_key_selector(node):
 
 	return key
 
-def coalesce_children(parent):
-	survivors = dict()
-
-	for child in parent.getchildren():
-		key = node_key_selector(parent)
-
-		if key in survivors:
-			survivors[key].extend(child.getchildren())
-			parent.remove(child)
-		else:
-			survivors[key] = child
+##
+# Fuck your arbitrary bullshit .csproj files
 
 def unfuckulate(inFileName, outFileName):
 	root = read_tree(inFileName)
-	coalesce_children(root)
-	sort_resursive(root.getchildren())
+	coalesce_tree(root)
+	sort_tree(root)
 	write_tree(outFileName, root)
 
 if __name__ == '__main__':
